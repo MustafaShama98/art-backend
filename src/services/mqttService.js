@@ -13,11 +13,12 @@ class MQTTService extends IMQTTService {
             protocol: 'mqtts',
         });
         this.installationCallbacks = new Map();
+        this.deletionCallbacks = new Map();
          this.devices = []
 
         this.mqttClient.on('connect', () => {
             console.log('Connected to MQTT broker');
-            this.mqttClient.subscribe('m5stack/#');
+            this.mqttClient.subscribe('m5stack/#', { qos: 2 });
             this.promptHeight();
         });
 
@@ -33,7 +34,7 @@ class MQTTService extends IMQTTService {
                     const callback = this.installationCallbacks.get(parseInt(sys_id));
                     if (callback && payload.success !== undefined) {
                         console.log(`Processing installation response for ${sys_id}:`, payload);
-                        callback(payload);
+                        await callback(payload);//it will resolve callback and return data to paintingController
                         this.installationCallbacks.delete(sys_id);
                     }
                 }
@@ -74,7 +75,9 @@ class MQTTService extends IMQTTService {
                             this.devices = [];
                         }
                         return;
+                    case 'delete':
 
+                        break;
                     case 'error':
                         console.error(`Error from device ${sys_id}:`, payload);
                         break;
@@ -90,18 +93,25 @@ class MQTTService extends IMQTTService {
     }
 
     async publish_installation(installationData) {
-        return new Promise((resolve, reject) => {
-            const sys_id = parseInt(installationData.sys_id);
+        const sys_id = parseInt(installationData.sys_id);
 
-            // Clear any existing callback
+        // Clear any existing callbacks for this sys_id
+        this.installationCallbacks.delete(sys_id);
+
+        try {
+            // Wait for the installation mqtt response on topic install
+            const response = await this.waitForInstallationResponse(sys_id);
+            return response;
+        } finally {
+            // Cleanup: remove the callback regardless of success/failure
             this.installationCallbacks.delete(sys_id);
+        }
+    }
 
+    async waitForInstallationResponse(sys_id) {
+        return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
-                if (this.installationCallbacks.has(sys_id)) {
-                    console.log(`Installation timeout for sys_id: ${sys_id}`);
-                    this.installationCallbacks.delete(sys_id);
-                    reject(new Error('Installation timeout'));
-                }
+                reject(new Error(`Installation timeout for sys_id: ${sys_id}`));
             }, 9000);
 
             this.installationCallbacks.set(sys_id, (response) => {
@@ -109,32 +119,83 @@ class MQTTService extends IMQTTService {
                 resolve(response);
             });
 
-            console.log('Publishing installation request:', installationData);
-            this.mqttClient.publish('install', JSON.stringify(installationData));
+            // Publish with QoS 2
+            console.log('Publishing installation request:', { sys_id });
+            this.mqttClient.publish('install', JSON.stringify({ sys_id }), { qos: 2 }, (err) => {
+                if (err) {
+                    clearTimeout(timeout);
+                    reject(new Error(`Failed to publish installation request: ${err.message}`));
+                }
+            });
         });
     }
 
-    async publish_height( sys_id) {
+
+    async publish_height(sys_id) {
         try {
-            const found_painting = await Painting.findOne({sys_id :sys_id});
+            const found_painting = await Painting.findOne({sys_id: sys_id});
             if(!found_painting)
                 return null;
-            console.log(found_painting)
-           const {base_height, height} = found_painting;
-           const height_adjust = base_height - (height/2 + 122);
-            console.log('found painting',JSON.stringify(height_adjust),base_height,height);
+
+            const {base_height, height} = found_painting;
+            const height_adjust = base_height - (height/2 + 122);
+
             if(height_adjust > 0) {
-                await this.mqttClient.publishAsync(`m5stack/${sys_id}/height`, JSON.stringify(height_adjust));
-                process.stdout.write('Height published successfully\n');
-                return true
+                // Publish with QoS 2
+                return new Promise((resolve, reject) => {
+                    this.mqttClient.publish(
+                        `m5stack/${sys_id}/height`,
+                        JSON.stringify(height_adjust),
+                        { qos: 2 },
+                        (err) => {
+                            if (err) {
+                                reject(err);
+                            } else {
+                                process.stdout.write('Height published successfully\n');
+                                resolve(true);
+                            }
+                        }
+                    );
+                });
             }
             console.log('height adjustment is minus.')
-            return false
+            return false;
         } catch (error) {
             process.stdout.write(`Error publishing height: ${error.message}\n`);
+            throw error;
         }
     }
 
+    publish_deletion(id) {
+        return new Promise((resolve, reject) => {
+            console.log('Publishing deletion request:', id);
+
+            // Set timeout for 9 seconds
+            const timeout = setTimeout(() => {
+                reject(new Error('Deletion request timed out after 9 seconds'));
+            }, 9000);
+
+            try {
+                this.mqttClient.publish(
+                    `m5stack/${id}/delete`,
+                    JSON.stringify(id),
+                    { qos: 2 },
+                    (err) => {
+                        clearTimeout(timeout); // Clear timeout regardless of success/failure
+
+                        if (err) {
+                            reject(new Error(`Deletion publication failed: ${err.message}`));
+                        } else {
+                            resolve({ success: true });
+                        }
+                    }
+                );
+            } catch (error) {
+                clearTimeout(timeout);
+                reject(new Error(`Deletion publication error: ${error.message}`));
+            }
+        });
+    }
     promptInstallation() {
         process.stdout.write('Enter sys_id: ');
         process.stdin.on('data', async (data) => {

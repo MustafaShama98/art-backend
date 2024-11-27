@@ -17,7 +17,7 @@ const paintingRoutes = require('./src/routes/PaintingRouter');
 const connectDB = require("./src/database/config");
 
 // Use routes - all painting routes will be prefixed with /api/paintings
-app.use('/api/paintings', paintingRoutes);
+app.use('/paintings', paintingRoutes);
 
 // 404 handler for undefined routes
 app.use((req, res) => {

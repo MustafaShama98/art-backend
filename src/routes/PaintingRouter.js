@@ -8,7 +8,7 @@ const MockMQTTService = require("../mocks/MockMQTTService");
 const mockMqttService = new MockMQTTService();
 
 // Create instances
-// const mqttService = new MQTTService();
+ const mqttService = new MQTTService();
 const paintingController = new PaintingController(mockMqttService);
 
 // Bind methods to maintain 'this' context

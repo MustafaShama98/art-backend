@@ -14,6 +14,9 @@ class MockMQTTService extends IMQTTService {
             height: {
                 success: true
             },
+            delete:{
+                success: true,
+            },
             ...mockResponses
         };
 
@@ -46,6 +49,19 @@ class MockMQTTService extends IMQTTService {
         }
 
         return this.mockResponses.height;
+    }
+
+    async publish_deletion(sys_id){
+        this.publishedMessages.push({
+            type: 'deletion',
+            data: sys_id
+        });
+
+        if (this.mockResponses.delete.error) {
+            throw new Error(this.mockResponses.delete.error);
+        }
+
+        return this.mockResponses.delete;
     }
 
     // Helper methods for testing

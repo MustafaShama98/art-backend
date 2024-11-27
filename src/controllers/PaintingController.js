@@ -122,7 +122,10 @@ class PaintingController {
 
     async deletePainting(req, res) {
         try {
-            const painting = await Painting.findBySysId(req.params.sys_id);
+            const {sys_id} = req.params
+            console.log('deletePainting',sys_id)
+            const painting =
+                await Painting.findOne({ sys_id : sys_id }, null, { lean: true });
 
             if (!painting) {
                 return res.status(404).json({
@@ -130,13 +133,16 @@ class PaintingController {
                     error: 'Painting not found'
                 });
             }
+           const mqttResponse =  await this.mqttService.publish_deletion(req.params.sys_id);
+            console.log('deletePainting: mqttResponse, ',mqttResponse)
+            if(mqttResponse.success) {
+                await Painting.deleteOne({ sys_id });
 
-            await painting.remove();
-
-            res.json({
-                success: true,
-                message: 'Painting removed successfully'
-            });
+                res.json({
+                    success: true,
+                    message: 'Painting removed successfully'
+                });
+            }
         } catch (error) {
             res.status(500).json({
                 success: false,
