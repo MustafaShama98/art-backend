@@ -15,6 +15,7 @@ app.use(morgan('dev')); // Optional: for logging
 // Import routes
 const paintingRoutes = require('./src/routes/PaintingRouter');
 const connectDB = require("./src/database/config");
+const {processFrame} = require("./src/camera/ML-Stream");
 
 // Use routes - all painting routes will be prefixed with /api/paintings
 app.use('/paintings', paintingRoutes);
@@ -43,6 +44,10 @@ app.listen(PORT, async () => {
     console.log(`Server is running on port ${PORT}`);
     await connectDB();
     console.log("Connected to MongoDB");
+
+// Start the frame capture and processing loop
+    console.log('Started capturing and processing frames...');
+    // await processFrame();
 
 });
 

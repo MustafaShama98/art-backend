@@ -1,7 +1,7 @@
 // routes/paintingRoutes.js
 const express = require('express');
 const router = express.Router();
-const PaintingController = require('../controllers/paintingController');
+const PaintingController = require('../controllers/PaintingController');
 const MQTTService = require('../services/mqttService');
 const MockMQTTService = require("../mocks/MockMQTTService");
 // Testing usage
