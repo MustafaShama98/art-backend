@@ -42,7 +42,7 @@ const isAdmin = (req, res, next) => {
 };
 // Use routes - all painting routes will be prefixed with /api/paintings
 app.use('/auth', require('./src/controllers/AuthController'));
-app.use('/paintings', isAuthenticated, paintingRoutes);
+app.use('/paintings', paintingRoutes);
 // 404 handler for undefined routes
 app.use((req, res) => {
     res.status(404).json({
@@ -66,7 +66,7 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
     console.log(`Server is running on port ${PORT}`);
     await connectDB();
-    // await seedUsers();
+     await seedUsers();
     console.log("Connected to MongoDB");
 
 // Start the frame capture and processing loop
