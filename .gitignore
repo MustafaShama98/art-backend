@@ -1,2 +1,4 @@
 node_modules
 
+/src/camera/detected_frames/
+/src/camera/frames/

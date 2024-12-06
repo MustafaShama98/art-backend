@@ -1,25 +1,30 @@
 const mqtt = require('mqtt');
 const Painting = require('../models/PaintingSystem');
 const IMQTTService = require("../interfaces/IMQTTService");
+const chalk = require('chalk');
+const {start_camera_analyze} = require("../camera/ML-Stream");
+const CameraProcessor = require("../camera/ML-Stream");
+const {PaintingStats} = require("../models/PaintingStats");
 
 class MQTTService extends IMQTTService {
     constructor() {
         super();
+        console.log('mqttttttt')
         this.mqttClient = mqtt.connect('mqtt://j81f31b4.ala.eu-central-1.emqxsl.com', {
             username: "art",
             password: "art123",
-            clientId: "art_backend",
+            // clientId: "art_backend111",
             port: 8883,
             protocol: 'mqtts',
         });
         this.installationCallbacks = new Map();
         this.deletionCallbacks = new Map();
          this.devices = []
-
+        this.camera = new CameraProcessor();
         this.mqttClient.on('connect', () => {
             console.log('Connected to MQTT broker');
+
             this.mqttClient.subscribe('m5stack/#', { qos: 2 });
-            this.promptHeight();
         });
 
         this.mqttClient.on('message', async (topic, message) => {
@@ -28,10 +33,11 @@ class MQTTService extends IMQTTService {
                 const payload = JSON.parse(message.toString());
                 console.log('Message payload:', payload);
 
-                const [mainTopic, sys_id, subTopic] = topic.split('/');
-                console.log('maintopic', mainTopic)
+                let [mainTopic, sys_id, subTopic] = topic.split('/');
+                sys_id = parseInt(sys_id)
+
                 if (mainTopic === 'install') {
-                    const callback = this.installationCallbacks.get(parseInt(sys_id));
+                    const callback = this.installationCallbacks.get(sys_id);
                     if (callback && payload.success !== undefined) {
                         console.log(`Processing installation response for ${sys_id}:`, payload);
                         await callback(payload);//it will resolve callback and return data to paintingController
@@ -40,12 +46,61 @@ class MQTTService extends IMQTTService {
                 }
 
                 switch (subTopic) {
-
                     case 'sensor':
-                        console.log(`sensor : Height adjustment response from ${sys_id}:`, payload);
-                        this.publish_height(sys_id).then(() => {
-                            console.log('sent height publish to m5stack');
-                        });
+                        console.log(`sensor : Height adjustment response from ${sys_id}:`);
+
+                        try {
+                            // Find or create stats record
+                            let stats = await PaintingStats.findOne({ sys_id: sys_id });
+                            const currentTime = new Date();
+
+                            // First time this painting has ever been viewed - need to create stats record
+                            if (!stats) {
+                                const painting = await Painting.findOne({ sys_id: sys_id });
+                                if (!painting) {
+                                    throw new Error(`No painting found with sys_id: ${sys_id}`);
+                                }
+
+                                stats = new PaintingStats({
+                                    sys_id: sys_id,
+                                    painting_id: painting._id
+                                });
+                                await stats.save();
+
+                                // First approach - detect wheelchair
+                                const is_detected = await this.camera.startAnalyze(sys_id);
+                                if(is_detected.detected) {
+                                    await this.publish_height(sys_id);
+                                }
+
+                                // Start new viewing session
+                                await stats.addViewingSession(currentTime, null);
+
+                            } else { //the painting is already in painting_stats collection
+                                // Check if there's an ongoing session
+                                const lastSession = stats.viewingSessions[stats.viewingSessions.length - 1];
+
+                                if (!lastSession || lastSession.endTime) {
+                                    // New approach - no ongoing session
+                                    const is_detected = await this.camera.startAnalyze(sys_id);
+                                    if(is_detected.detected) {
+                                        await this.publish_height(sys_id);
+                                    }
+                                    // Start new session
+                                    await stats.addViewingSession(currentTime, null);
+
+                                } else {
+                                    // Person leaving - end current session
+                                    await stats.addViewingSession(lastSession.startTime, currentTime);
+                                }
+                            }
+
+                            await stats.save();
+                            console.log(chalk.bgGreen(`Updated viewing statistics for painting ${sys_id}`));
+
+                        } catch (error) {
+                            console.error('Error handling sensor trigger:', error);
+                        }
                         break;
                     case 'height':
                         console.log(`Height adjustment response from ${sys_id}:`, payload);
