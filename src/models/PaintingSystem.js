@@ -12,6 +12,11 @@ const paintingSchema = new mongoose.Schema({
         required: [true, 'Painting name is required'],
         trim: true
     },
+    painter_name: {
+        type: String,
+        required: [true, ' Painter name is required'],
+        trim: true
+    },
     base_height: {
         type: Number,
         required: [true, 'Base height is required'],
@@ -32,6 +37,11 @@ const paintingSchema = new mongoose.Schema({
         enum: ['active', 'inactive', 'maintenance', 'error'],
         default: 'inactive'
     },
+    photo: {
+        type: Buffer, // Storing photo as binary data
+        required: false,
+    },
+    
     lastUpdated: {
         type: Date,
         default: Date.now
