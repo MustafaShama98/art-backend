@@ -62,51 +62,68 @@ const paintingStatsSchema = new mongoose.Schema({
     timestamps: true
 });
 
-paintingStatsSchema.methods.addViewingSession = async function(startTime, endTime) {
+paintingStatsSchema.methods.addViewingSession = async function (startTime, endTime) {
     if (!endTime) {
-        // This is a new ongoing session
+        // Handle a new ongoing session
         this.viewingSessions.push({
             startTime,
             endTime: null,
-            duration: null
+            duration: null,
         });
         this.lastViewed = startTime;
-        return this.save();
+        return await this.save();
     }
 
     const duration = Math.floor((endTime - startTime) / 1000);
 
-    this.viewingSessions.push({
-        startTime,
-        endTime,
-        duration
-    });
+    // Find the session by matching the startTime
+    const sessionIndex = this.viewingSessions.findIndex(
+        (session) => session.startTime?.getTime() === startTime?.getTime()
+    );
 
-    // Update stats
-    this.totalViews += 1;
-    this.totalViewDuration += duration;
-    this.averageViewDuration = this.totalViewDuration / this.totalViews;
+    if (sessionIndex !== -1) {
+        // Update the existing session
+        this.viewingSessions[sessionIndex] = {
+            startTime : this.viewingSessions[sessionIndex].startTime, // Retain existing fields
+            endTime,
+            duration,
+        };
+
+    }
+    // Update total stats
+    this.totalViews = (this.totalViews || 0) + 1;
+    this.totalViewDuration = (this.totalViewDuration || 0) + duration;
+    this.averageViewDuration =
+        this.totalViews > 0
+            ? this.totalViewDuration / this.totalViews
+            : 0;
     this.lastViewed = endTime;
 
     // Update daily stats
-    const dateKey = new Date(startTime.toISOString().split('T')[0]);
+    const dateKey = new Date(startTime.toISOString().split("T")[0]);
     const dailyStatIndex = this.dailyStats.findIndex(
-        stat => stat.date.toISOString().split('T')[0] === dateKey.toISOString().split('T')[0]
+        (stat) =>
+            stat.date.toISOString().split("T")[0] ===
+            dateKey.toISOString().split("T")[0]
     );
 
     if (dailyStatIndex >= 0) {
+        // Update existing daily stats
         this.dailyStats[dailyStatIndex].views += 1;
         this.dailyStats[dailyStatIndex].totalDuration += duration;
     } else {
+        // Add new daily stats
         this.dailyStats.push({
             date: dateKey,
             views: 1,
-            totalDuration: duration
+            totalDuration: duration,
         });
     }
 
-    return this.save();
+    // Save the updated document
+    return await this.save();
 };
+
 // Static method to get statistics for a date range
 paintingStatsSchema.statics.getStatsByDateRange = async function(startDate, endDate) {
     return this.aggregate([

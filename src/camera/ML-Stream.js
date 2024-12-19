@@ -2,26 +2,33 @@ const axios = require('axios');
 const fs = require('fs').promises;
 const path = require('path');
 const chalk = require('chalk');
+const {json} = require("express");
 
 // Store active camera processing states
 
 
 
 class CameraProcessor {
-    constructor() {
+    constructor(mqttClient) {
+        this.mqttClient = mqttClient;
         this.activeSystems = new Map();
-        this.timeoutDuration = 12000;
+        this.timeoutDuration = 24000;
         this.errorTimeoutDuration = 25000;
-        this.frameInterval = 2000;
+        this.frameInterval = 1000;
+        this.frameCallbacks= new Map();
     }
-    async startAnalyze(sys_id, camera_host ='http://127.0.0.1:4000/video_feed') {
+    async startAnalyze(sys_id) {
         if (this.activeSystems.get(sys_id) === 'active') {
             console.log(chalk.yellow(`System ${sys_id} is already running`));
             return;
         }
 
         try {
-            const result = await this.processCamera(sys_id, camera_host);
+            console.log('Start camera frame analyzing..')
+            const result = await this.processCamera(sys_id);
+            // Publish frame request
+
+
             console.log(chalk.blue(`System ${sys_id} completed processing:`), {
                 detected: result.detected,
                 reason: result.reason
@@ -32,6 +39,22 @@ class CameraProcessor {
             this.activeSystems.delete(sys_id);
             return { detected: false, reason: 'fatal_error' };
         }
+    }
+
+    async waitForFrame(sys_id) {
+        // Implement a Promise-based waiting mechanism
+        return new Promise((resolve, reject) => {
+            // Set up a timeout
+            const timeout = setTimeout(() => {
+                reject(new Error('Frame request timeout, waitForFrame'));
+            }, 5000); // 5 second timeout
+
+            // Store the resolve function to be called when the frame is received
+            this.frameCallbacks.set(sys_id, (frameData) => {
+                clearTimeout(timeout);
+                resolve(frameData);
+            });
+        });
     }
 
     getSystemStatus(sys_id) {
@@ -46,7 +69,7 @@ class CameraProcessor {
         }
         return false;
     }
-    async processCamera(sys_id, camera_host, startProcessingTime = Date.now()) {
+    async processCamera(sys_id, startProcessingTime = Date.now()) {
         if (this.isTimeoutReached(startProcessingTime)) {
             return this.handleTimeout(sys_id);
         }
@@ -55,12 +78,16 @@ class CameraProcessor {
         const frameStartTime = Date.now();
 
         try {
-            const { base64Image, frameData } = await MockcaptureFrame(camera_host);
 
-            // const { base64Image, frameData } = await this.captureFrame(camera_host);
-            await this.saveFrame(sys_id, frameData);
 
-            // const isWheelchairDetected = await detect_activeLearning(base64Image);
+            // Capture the frame - this is already a base64 string
+            const base64Image = await this.captureFrame(sys_id);
+
+            // Save the original frame data if needed (you might want to decode it back to a buffer)
+            await this.saveFrame(sys_id, Buffer.from(base64Image, 'base64'));
+
+
+             //const isWheelchairDetected = await detect_activeLearning(base64Image);
             const isWheelchairDetected = await mock_detect(base64Image);
 
             console.log(chalk.cyan(`System ${sys_id} - Wheelchair detection status:`, isWheelchairDetected));
@@ -70,24 +97,30 @@ class CameraProcessor {
             }
 
             await this.waitForNextFrame(frameStartTime);
-            return this.processCamera(sys_id, camera_host, startProcessingTime);
+            return this.processCamera(sys_id, startProcessingTime);
         } catch (error) {
-            return this.handleError(sys_id, startProcessingTime, camera_host, error);
+            return this.handleError(sys_id, startProcessingTime, error);
         }
     }
 
 
 
-    async captureFrame(camera_host) {
-        const response = await axios({
-            method: 'get',
-            url: camera_host,
-            responseType: 'arraybuffer',
+    async captureFrame(sys_id) {
+        return new Promise((resolve, reject) => {
+            // Create a callback that will be called when the frame is received
+            const frameCallback = (frameData) => {
+                resolve(frameData);
+                console.log(chalk.cyan('captureFrame callback data,'))
+            };
+
+            // Store the callback in MQTTService's frameCallbacks Map
+            this.mqttClient.registerFrameCallback(sys_id, frameCallback);
+
+            // Publish a request to get the frame
+            this.mqttClient.publishGetFrame(sys_id);
         });
-        return {
-            base64Image: Buffer.from(response.data).toString('base64'),
-            frameData: response.data
-        };
+
+
     }
 
     async saveFrame(sys_id, frameData) {
@@ -117,7 +150,7 @@ class CameraProcessor {
         return { detected: true, reason: 'wheelchair_detected' };
     }
 
-    async handleError(sys_id, startTime, camera_host, error) {
+    async handleError(sys_id, startTime, error) {
         console.error(chalk.red(`Error in system ${sys_id}:`, error.message));
 
         if (Date.now() - startTime >= this.errorTimeoutDuration) {
@@ -127,7 +160,7 @@ class CameraProcessor {
 
         if (this.activeSystems.get(sys_id) === 'active') {
             await new Promise(resolve => setTimeout(resolve, 1000));
-            return this.processCamera(sys_id, camera_host, startTime);
+            return this.processCamera(sys_id, startTime);
         }
 
         this.activeSystems.delete(sys_id);
@@ -241,7 +274,7 @@ async function detect_activeLearning(base64Image) {
 
 async function mock_detect(base64image){
     new Promise(resolve => setTimeout(resolve, 1000));
-    return false
+    return true
 }
 
 async function MockcaptureFrame(camera_host) {
