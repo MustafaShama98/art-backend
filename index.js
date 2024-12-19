@@ -40,8 +40,7 @@ const isAdmin = (req, res, next) => {
     }
     res.status(403).json({ message: 'Forbidden' });
 };
-const bodyParser = require('body-parser');
-app.use(bodyParser.json({ limit: '5mb' }))
+
 // Use routes - all painting routes will be prefixed with /api/paintings
 app.use('/auth', require('./src/controllers/AuthController'));
 app.use('/paintings', paintingRoutes);

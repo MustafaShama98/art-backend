@@ -70,7 +70,7 @@ class PaintingController {
             const response = await this.mqttService.publish_installation(installationData);
     
             if (response.success) {
-                const painting = new Painting({ ...installationData, status: 'active' });
+                const painting = new Painting({ ...installationData, status: 'Active' });
                 await painting.save();
     
                 res.status(201).json({
@@ -94,9 +94,10 @@ class PaintingController {
     
 
     async updatePainting(req, res) {
+        console.log('body', req.body.data)
         try {
             const painting = await Painting.findOne({ sys_id: req.params.sys_id });
-    
+
             if (!painting) {
                 return res.status(404).json({
                     success: false,
@@ -105,35 +106,18 @@ class PaintingController {
             }
     
             // Destructure fields to be updated from the request body
-            const { height, base_height, status, painter_name, name,width,photo } = req.body;
-    
+            const {  name,painter_name,base_height,height,width,status,photo,weight } = req.body.data;
             // Update fields only if they are provided
-            if (height !== undefined) {
                 painting.height = height;
-            }
-    
-            if (base_height !== undefined) {
                 painting.base_height = base_height;
-            }
-    
-            if (status !== undefined) {
                 painting.status = status;
-            }
-    
-            if (painter_name !== undefined) {
                 painting.painter_name = painter_name;
-            }
-    
-            if (name !== undefined) {
                 painting.name = name;
-            }
-            if (width !== undefined) {
                 painting.width = width;
-            }
-            if (photo !== undefined) {
+                painting.weight=weight;
+                if(photo)
                 painting.photo = photo; 
-            }
-    
+            
             console.log('Saving painting with updates:', painting);
             await painting.save(); // Save updated document to the database
     
@@ -154,7 +138,6 @@ class PaintingController {
     async deletePainting(req, res) {
         try {
             const {sys_id} = req.params
-            console.log('deletePainting',sys_id)
             const painting =
                 await Painting.findOne({ sys_id : sys_id }, null, { lean: true });
 

@@ -7,6 +7,7 @@ const paintingSchema = new mongoose.Schema({
         unique: true,
         trim: true
     },
+    
     name: {
         type: String,
         required: [true, 'Painting name is required'],
@@ -32,10 +33,14 @@ const paintingSchema = new mongoose.Schema({
         required: [true, 'Width is required'],
         min: [0, 'Width cannot be negative']
     },
+    weight: {
+        type: Number,
+        required: true,
+    },
     status: {
         type: String,
-        enum: ['active', 'inactive', 'maintenance', 'error'],
-        default: 'inactive'
+        enum: ['Active', 'Inactive'],
+        default: 'Inactive'
     },
     photo: {
         type: Buffer, // Storing photo as binary data
