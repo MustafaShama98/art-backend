@@ -9,19 +9,27 @@ class PaintingController {
     async getAllPaintings(req, res) {
         try {
             const paintings = await Painting.find();
-
+    
+            // Convert binary photo data to Base64
+            const formattedPaintings = paintings.map((painting) => ({
+                ...painting.toObject(),
+                photo: painting.photo ? `data:image/jpeg;base64,${painting.photo.toString('base64')}` : null,
+            }));
+    
             res.json({
                 success: true,
-                count: paintings.length,
-                data: paintings
+                count: formattedPaintings.length,
+                data: formattedPaintings,
             });
         } catch (error) {
+            console.error("Error fetching paintings:", error);
             res.status(500).json({
                 success: false,
-                error: error.message
+                error: error.message,
             });
         }
     }
+    
 
     async getPainting(req, res) {
         try {
@@ -48,42 +56,47 @@ class PaintingController {
 
     async createPainting(req, res) {
         try {
+            const { photo, ...otherData } = req.body;
+    
+            // Convert Base64 to Buffer
+            const bufferPhoto = photo ? Buffer.from(photo.split(",")[1], "base64") : null;
+    
             const installationData = {
                 sys_id: Date.now(),
-                ...req.body
+                ...otherData,
+                photo: bufferPhoto, // Save buffer in DB
             };
-
-            console.log('createPainting: Starting installation process for:', installationData);
-
+    
             const response = await this.mqttService.publish_installation(installationData);
-            console.log('createPainting: Received installation response:', response);
-
+    
             if (response.success) {
-                const painting = new Painting({...installationData, status:'active'});
+                const painting = new Painting({ ...installationData, status: 'Active' });
                 await painting.save();
-                console.log('createPainting: Saved to database');
+    
                 res.status(201).json({
                     success: true,
-                    data: painting
+                    data: painting,
                 });
             } else {
                 res.status(400).json({
                     success: false,
-                    error: response.error || 'createPainting: Installation failed'
+                    error: response.error || 'Installation failed',
                 });
             }
         } catch (error) {
-            console.error('createPainting:  error:', error);
+            console.error('createPainting: Error:', error);
             res.status(500).json({
                 success: false,
-                error: error.message
+                error: error.message,
             });
         }
     }
+    
 
     async updatePainting(req, res) {
+        console.log('body', req.body.data)
         try {
-            const painting = await Painting.findBySysId(req.params.sys_id);
+            const painting = await Painting.findOne({ sys_id: req.params.sys_id });
 
             if (!painting) {
                 return res.status(404).json({
@@ -91,39 +104,40 @@ class PaintingController {
                     error: 'Painting not found'
                 });
             }
-
-            const { height, base_height, status } = req.body;
-
-            if (height !== undefined) {
-                await painting.updateHeight(height);
-            }
-
-            if (base_height !== undefined) {
+    
+            // Destructure fields to be updated from the request body
+            const {  name,painter_name,base_height,height,width,status,photo,weight } = req.body.data;
+            // Update fields only if they are provided
+                painting.height = height;
                 painting.base_height = base_height;
-            }
-
-            if (status !== undefined) {
                 painting.status = status;
-            }
-
-            await painting.save();
-
+                painting.painter_name = painter_name;
+                painting.name = name;
+                painting.width = width;
+                painting.weight=weight;
+                if(photo)
+                painting.photo = photo; 
+            
+            console.log('Saving painting with updates:', painting);
+            await painting.save(); // Save updated document to the database
+    
             res.json({
                 success: true,
                 data: painting
             });
         } catch (error) {
+            console.error('Error during updatePainting:', error);
             res.status(500).json({
                 success: false,
                 error: error.message
             });
         }
     }
-
+    
+    
     async deletePainting(req, res) {
         try {
             const {sys_id} = req.params
-            console.log('deletePainting',sys_id)
             const painting =
                 await Painting.findOne({ sys_id : sys_id }, null, { lean: true });
 
