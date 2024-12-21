@@ -11,7 +11,7 @@ const MockMQTTService = require("../mocks/MockMQTTService");
 console.log('router')
 // const mqttService = MQTTService.getInstance();
 // Only initialize these routes once
-const paintingController = new PaintingController( mockMqttService);
+const paintingController = new PaintingController( new MQTTService);
 
 
 

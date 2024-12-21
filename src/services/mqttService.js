@@ -190,9 +190,13 @@ class MQTTService extends IMQTTService {
 
     async publish_installation(installationData) {
         const sys_id = parseInt(installationData.sys_id);
-
+        installationData.width = parseInt(installationData.width)
+        installationData.height = parseInt(installationData.height)
+        installationData.weight = parseInt(installationData.weight)
+        installationData.base_height = parseInt(installationData.base_height)
+        console.log('installl data, ', installationData)
         // Clear any existing callbacks for this sys_id
-        this.installationCallbacks.delete(sys_id);
+        this.installationCallbacks.delete(sys_id)
 
         try {
             // Wait for the installation mqtt response on topic install
@@ -208,13 +212,14 @@ class MQTTService extends IMQTTService {
         return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
                 reject(new Error(`Installation timeout for sys_id: ${sys_id}`));
-            }, 9000);
+            }, 15000);
 
             this.installationCallbacks.set(sys_id, (response) => {
                 clearTimeout(timeout);
                 resolve(response);
             });
         const {base_height, height, width} = installationData
+        console.log('tyoe pf ', typeof height, typeof JSON.stringify(height))
             // Publish with QoS 2
             console.log('Publishing installation request:', {sys_id});
             this.mqttClient.publish('install', JSON.stringify({sys_id,base_height, height, width}),

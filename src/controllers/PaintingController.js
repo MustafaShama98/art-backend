@@ -63,10 +63,10 @@ class PaintingController {
     
             const installationData = {
                 sys_id: Date.now(),
-                ...otherData,
+                ...otherData    ,
                 photo: bufferPhoto, // Save buffer in DB
             };
-    
+                
             const response = await this.mqttService.publish_installation(installationData);
     
             if (response.success) {
