@@ -218,11 +218,11 @@ class MQTTService extends IMQTTService {
                 clearTimeout(timeout);
                 resolve(response);
             });
-        const {base_height, height, width} = installationData
+        const {base_height, height, width, microcontroller} = installationData
         console.log('tyoe pf ', typeof height, typeof JSON.stringify(height))
             // Publish with QoS 2
             console.log('Publishing installation request:', {sys_id});
-            this.mqttClient.publish('install', JSON.stringify({sys_id,base_height, height, width}),
+            this.mqttClient.publish('install', JSON.stringify({sys_id,base_height, height, width,microcontroller}),
                 {qos: 2}, (err) => {
                 if (err) {
                     clearTimeout(timeout);

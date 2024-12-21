@@ -13,6 +13,11 @@ const paintingSchema = new mongoose.Schema({
         required: [true, 'Painting name is required'],
         trim: true
     },
+    microcontroller: {
+        type: String,
+        required: [true, 'microcontroler name is required'],
+        trim: true
+    },
     painter_name: {
         type: String,
         required: [true, ' Painter name is required'],
