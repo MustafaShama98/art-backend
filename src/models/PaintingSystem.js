@@ -13,11 +13,7 @@ const paintingSchema = new mongoose.Schema({
         required: [true, 'Painting name is required'],
         trim: true
     },
-    microcontroller: {
-        type: String,
-        required: [true, 'microcontroler name is required'],
-        trim: true
-    },
+   
     painter_name: {
         type: String,
         required: [true, ' Painter name is required'],
@@ -40,13 +36,19 @@ const paintingSchema = new mongoose.Schema({
     },
     weight: {
         type: Number,
-        required: true,
+        required: [true, 'Weight is required'],
+        min: [0, 'Weight cannot be negative']
+    },
+     microcontroller: {
+        type: String,
+        trim: true
     },
     status: {
         type: String,
         enum: ['Active', 'Inactive'],
         default: 'Inactive'
     },
+    
     photo: {
         type: Buffer, // Storing photo as binary data
         required: false,

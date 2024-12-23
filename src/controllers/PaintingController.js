@@ -1,4 +1,5 @@
 const Painting = require('../models/PaintingSystem');
+const {PaintingStats} = require('../models/PaintingStats');
 
 // controllers/PaintingController.js
 class PaintingController {
@@ -68,7 +69,7 @@ class PaintingController {
             };
                 
             const response = await this.mqttService.publish_installation(installationData);
-    
+           
             if (response.success) {
                 const painting = new Painting({ ...installationData, status: 'Active' });
                 await painting.save();
@@ -106,7 +107,7 @@ class PaintingController {
             }
     
             // Destructure fields to be updated from the request body
-            const {  name,painter_name,base_height,height,width,status,photo,weight } = req.body.data;
+            const {  name,painter_name,base_height,height,width,status,photo,weight,microcontroller} = req.body.data;
             // Update fields only if they are provided
                 painting.height = height;
                 painting.base_height = base_height;
@@ -115,6 +116,7 @@ class PaintingController {
                 painting.name = name;
                 painting.width = width;
                 painting.weight=weight;
+                painting.microcontroller=microcontroller;
                 if(photo)
                 painting.photo = photo; 
             
@@ -151,6 +153,7 @@ class PaintingController {
             console.log('deletePainting: mqttResponse, ',mqttResponse)
             if(mqttResponse.success) {
                 await Painting.deleteOne({ sys_id });
+                await PaintingStats.deleteOne( { sys_id})
 
                 res.json({
                     success: true,
@@ -164,6 +167,43 @@ class PaintingController {
             });
         }
     }
+    async getStats(req, res) {
+        try {
+            console.log('Inside getStats method');
+            
+            // Fetch stats and populate the painting name from the Painting model
+            const stats = await PaintingStats.find()
+                .populate({
+                    path: 'painting_id', // Reference to the Painting model
+                    select: 'name', // Select only the name field from the Painting model
+                });
+
+                
+                // Flatten the response to include the painting name at the top level
+            const flattenedStats = stats.map(stat => ({
+                ...stat.toObject(),
+                name: stat.painting_id?.name || 'Unknown', 
+              
+            }));
+            console.log('Stats fetched:', flattenedStats);
+    
+            
+    
+            res.json({
+                success: true,
+                data: flattenedStats,
+            });
+        } catch (error) {
+            console.error('Error in getStats:', error.message);
+            res.status(500).json({
+                success: false,
+                error: error.message,
+            });
+        }
+    }
+    
+
+
 }
 
 module.exports = PaintingController;

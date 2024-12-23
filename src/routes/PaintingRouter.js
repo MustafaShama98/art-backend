@@ -11,13 +11,20 @@ const MockMQTTService = require("../mocks/MockMQTTService");
 console.log('router')
 // const mqttService = MQTTService.getInstance();
 // Only initialize these routes once
-const paintingController = new PaintingController( new MQTTService);
+const paintingController = new PaintingController(mockMqttService);
 
 
 
  router.route('/')
      .get(paintingController.getAllPaintings.bind(paintingController))
-     .post(paintingController.createPainting.bind(paintingController));
+     .post(paintingController.createPainting.bind(paintingController))
+     
+    
+ router.route('/painting_stats')
+ .get(paintingController.getStats.bind(paintingController));
+
+    
+
 
  router.route('/:sys_id')
      .get(paintingController.getPainting.bind(paintingController))

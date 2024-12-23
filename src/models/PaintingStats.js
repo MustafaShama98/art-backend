@@ -1,6 +1,7 @@
 // models/PaintingStats.js
 const mongoose = require('mongoose');
 const Painting = require('./PaintingSystem');
+
 const viewingSessionSchema = new mongoose.Schema({
     startTime: {
         type: Date,
@@ -23,6 +24,7 @@ const paintingStatsSchema = new mongoose.Schema({
         ref: 'Painting',
         required: true
     },
+    
     sys_id: {
         type: Number,
         required: true,
