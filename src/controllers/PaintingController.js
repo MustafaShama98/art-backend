@@ -69,7 +69,7 @@ class PaintingController {
             };
                 
             const response = await this.mqttService.publish_installation(installationData);
-           
+    
             if (response.success) {
                 const painting = new Painting({ ...installationData, status: 'Active' });
                 await painting.save();

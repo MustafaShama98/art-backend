@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const paintingSchema = new mongoose.Schema({
     sys_id: {
         type: Number,
-        required: true,
+        required: [true, 'weight is required'],
         unique: true,
         trim: true
     },

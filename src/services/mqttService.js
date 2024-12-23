@@ -6,7 +6,8 @@ const {start_camera_analyze} = require("../camera/ML-Stream");
 const CameraProcessor = require("../camera/ML-Stream");
 const {PaintingStats} = require("../models/PaintingStats");
 const { AsyncClient } = require("async-mqtt");
-
+const {broadcastWS} = require("./websocketService");
+const {painting_status} = require('../utils/config')
 class MQTTService extends IMQTTService {
     constructor() {
         super();
@@ -73,9 +74,13 @@ class MQTTService extends IMQTTService {
                                 await stats.save();
 
                                 // First approach - detect wheelchair
+                                painting_status.sensor = true
                                 const is_detected = await this.camera.startAnalyze(sys_id);
                                 if (is_detected.detected) {
                                     await this.publish_height(sys_id);
+                                    painting_status.wheelchair = true
+                                    await broadcastWS(painting_status)
+
                                 }
 
                                 // Start new viewing session
@@ -97,10 +102,14 @@ class MQTTService extends IMQTTService {
 
                                 if ( !lastSession || lastSession.endTime) {
                                     // New approach - no ongoing session or previous session has ended
+                                    painting_status.sensor = true
                                     console.log(chalk.green('New approach - no ongoing session or previous session has ended:'));
                                     const is_detected = await this.camera.startAnalyze(sys_id);
                                     if (is_detected.detected) {
                                         await this.publish_height(sys_id);
+                                        painting_status.wheelchair = true
+                                        await broadcastWS(painting_status)
+
                                     }
 
                                     // Start new session
@@ -113,6 +122,9 @@ class MQTTService extends IMQTTService {
                                     ('Person leaving - end current session\n'));
 
                                     await stats.addViewingSession(lastSession.startTime, currentTime);
+                                    painting_status.wheelchair = false
+                                    painting_status.sensor = false
+                                    await broadcastWS(painting_status)
                                 }
                             }
 
@@ -244,15 +256,17 @@ class MQTTService extends IMQTTService {
 
             if (height_adjust > 0) {
                 // Publish with QoS 2
-                return new Promise((resolve, reject) => {
+                return await new Promise((resolve, reject) => {
                     this.mqttClient.publish(
                         `m5stack/${sys_id}/height`,
                         JSON.stringify(height_adjust),
                         {qos: 2},
-                        (err) => {
+                        async (err) => {
                             if (err) {
                                 reject(err);
                             } else {
+                                painting_status.height = true
+                                await broadcastWS(painting_status)
                                 process.stdout.write('Height published successfully\n');
                                 resolve(true);
                             }

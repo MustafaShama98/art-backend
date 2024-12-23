@@ -5,8 +5,8 @@ const {User} = require("../models/User");
 router.post('/signup', async (req, res) => {
     try {
         const { username, password } = req.body;
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const user = await User.create({ username, password: hashedPassword });
+        // const hashedPassword = await bcrypt.hash(password, 10);
+        const user = await User.create({ username, password: password });
         res.status(201).json({ message: 'User created' });
     } catch (error) {
         res.status(400).json({ error: error.message });

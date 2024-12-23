@@ -274,7 +274,7 @@ async function detect_activeLearning(base64Image) {
 
 async function mock_detect(base64image){
     new Promise(resolve => setTimeout(resolve, 1000));
-    return false
+    return true
 }
 
 async function MockcaptureFrame(camera_host) {

@@ -25,6 +25,8 @@ const {processFrame, processCamera, start_camera_analyze} = require("./src/camer
 const MQTTService = require("./src/services/mqttService");
 const {initializePaintingStats} = require("./src/models/PaintingStats");
 const {seedUsers} = require("./src/models/User");
+const {initializeWebSocket} = require("./src/services/websocketService");
+const {createServer} = require("node:http");
 
 // middleware/auth.js
 const isAuthenticated = (req, res, next) => {
@@ -62,18 +64,20 @@ app.use((err, req, res, next) => {
 });
 let mqttService
 // Start server
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, async () => {
+const server = app.listen(PORT, async () => {
     console.log(`Server is running on port ${PORT}`);
     await connectDB();
-     await seedUsers();
+     // await seedUsers();
     console.log("Connected to MongoDB");
 
-// Start the frame capture and processing loop
-    // const is_detected = await start_camera_analyze('35355')
-    // console.log(is_detected)
 });
 
-// For testing purposes
+const wss = initializeWebSocket(server);
+console.log('WebSocket server initialized');
+app.on('error', (error) => {
+    console.error('Server error:', error);
+});
+
 module.exports = app;
