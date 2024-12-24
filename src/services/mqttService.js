@@ -8,6 +8,8 @@ const {PaintingStats} = require("../models/PaintingStats");
 const { AsyncClient } = require("async-mqtt");
 const {broadcastWS} = require("./websocketService");
 const {painting_status} = require('../utils/config')
+const sleep = (ms) =>
+    new Promise(resolve => setTimeout(resolve, ms));
 class MQTTService extends IMQTTService {
     constructor() {
         super();
@@ -19,6 +21,7 @@ class MQTTService extends IMQTTService {
             port: 8883,
             protocol: 'mqtts',
         });
+        this.paintingStatusMap = new Map(); // Map to hold painting status for each sys_id
         const asyncClient = new AsyncClient(this.mqttClient);
         this.installationCallbacks = new Map();
         this.deletionCallbacks = new Map();
@@ -40,7 +43,13 @@ class MQTTService extends IMQTTService {
 
                 let [mainTopic, sys_id, subTopic] = topic.split('/');
                 sys_id = parseInt(sys_id)
-
+                if (!this.paintingStatusMap.has(sys_id)) {
+                    this.paintingStatusMap.set(sys_id, {
+                        wheelchair: false,
+                        sensor: false,
+                        height_adjust: false,
+                    });
+                }
                 if (mainTopic === 'install') {
                     const callback = this.installationCallbacks.get(sys_id);
                     if (callback && payload.success !== undefined) {
@@ -52,16 +61,19 @@ class MQTTService extends IMQTTService {
 
                 switch (subTopic) {
                     case 'sensor':
-                        console.log(`sensor : Height adjustment response from ${sys_id}:`);
-
+                        console.log(`sensor :  response from ${sys_id}:`);
+                        const paintingStatus = this.paintingStatusMap.get(sys_id)
+                        paintingStatus.sensor = true;
+                        await broadcastWS({sys_id,...paintingStatus})
                         try {
+                            const painting = await Painting.findOne({sys_id})
+                            painting.sensor = true
                             // Find or create stats record
                             let stats = await PaintingStats.findOne({sys_id: sys_id});
                             const currentTime = new Date();
 
                             // First time this painting has ever been viewed - need to create stats record
                             if (!stats) {
-                                const painting = await Painting.findOne({sys_id: sys_id});
                                 if (!painting) {
                                     throw new Error(`No painting found with sys_id: ${sys_id}`);
                                 }
@@ -74,13 +86,17 @@ class MQTTService extends IMQTTService {
                                 await stats.save();
 
                                 // First approach - detect wheelchair
-                                painting_status.sensor = true
-                                const is_detected = await this.camera.startAnalyze(sys_id);
+                                const is_detected = await this.camera.startAnalyze(sys_id)
+                                await sleep(3000)
                                 if (is_detected.detected) {
                                     await this.publish_height(sys_id);
-                                    painting_status.wheelchair = true
-                                    await broadcastWS(painting_status)
+                                    painting.wheelchair = true
+                                    paintingStatus.wheelchair = true;
+                                    await broadcastWS({sys_id,...paintingStatus})
 
+                                }else {
+                                    paintingStatus.wheelchair = false;
+                                    painting.wheelchair= false
                                 }
 
                                 // Start new viewing session
@@ -102,13 +118,17 @@ class MQTTService extends IMQTTService {
 
                                 if ( !lastSession || lastSession.endTime) {
                                     // New approach - no ongoing session or previous session has ended
-                                    painting_status.sensor = true
+                                    // paintingStatus.sensor = true
+                                    // painting.sensor = true
                                     console.log(chalk.green('New approach - no ongoing session or previous session has ended:'));
                                     const is_detected = await this.camera.startAnalyze(sys_id);
+                                    await sleep(3000)
+
                                     if (is_detected.detected) {
                                         await this.publish_height(sys_id);
-                                        painting_status.wheelchair = true
-                                        await broadcastWS(painting_status)
+                                        paintingStatus.wheelchair = true
+                                        painting.wheelchair = true
+                                        await broadcastWS({sys_id,...paintingStatus})
 
                                     }
 
@@ -122,13 +142,18 @@ class MQTTService extends IMQTTService {
                                     ('Person leaving - end current session\n'));
 
                                     await stats.addViewingSession(lastSession.startTime, currentTime);
-                                    painting_status.wheelchair = false
-                                    painting_status.sensor = false
-                                    await broadcastWS(painting_status)
+                                    paintingStatus.wheelchair = false
+                                    paintingStatus.sensor = false
+                                    paintingStatus.height_adjust = false
+                                    painting.wheelchair = false
+                                    painting.sensor = false
+                                    painting.height_adjust = false
+                                    await broadcastWS({sys_id,...paintingStatus})
                                 }
                             }
 
                             await stats.save();
+                            await painting.save()
                             console.log(chalk.bgGreen(`Updated viewing statistics for painting ${sys_id}`));
 
                         } catch (error) {
@@ -136,7 +161,14 @@ class MQTTService extends IMQTTService {
                         }
                         break;
                     case 'height':
-                        console.log(`Height adjustment response from ${sys_id}:`, payload);
+                        console.log(chalk.bgMagenta(`Height adjustment response from ${sys_id}:`), payload);
+                        const status = this.paintingStatusMap.get(sys_id);
+                        const painting = await Painting.findOne({sys_id})
+                        status.height_adjust = true
+                        painting.height_adjust =true
+                        await sleep(3000)
+                        await broadcastWS({sys_id,...status})
+                        await painting.save()
                         if (payload.status) {
                             console.log('received status height done from m5stack')
                             //we might send an rest api back to dashboard
@@ -265,8 +297,7 @@ class MQTTService extends IMQTTService {
                             if (err) {
                                 reject(err);
                             } else {
-                                painting_status.height = true
-                                await broadcastWS(painting_status)
+
                                 process.stdout.write('Height published successfully\n');
                                 resolve(true);
                             }

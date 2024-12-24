@@ -48,7 +48,21 @@ const paintingSchema = new mongoose.Schema({
         enum: ['Active', 'Inactive'],
         default: 'Inactive'
     },
-    
+    sensor: {
+        type: Boolean,
+        default: false,
+        required: false,
+    },
+    wheelchair: {
+        type: Boolean,
+        default: false,
+        required: false,
+    },
+    height_adjust: {
+        type: Boolean,
+        default: false,
+        required: false,
+    },
     photo: {
         type: Buffer, // Storing photo as binary data
         required: false,

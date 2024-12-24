@@ -1,4 +1,4 @@
-const painting_status = {
+let painting_status = {
     wheelchair: false,
     sensor: false,
     height: false

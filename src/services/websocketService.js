@@ -11,8 +11,8 @@ function initializeWebSocket(server) {
         console.log('New client connected');
         clients.add(ws);
 
-        ws.on('close', () => {
-            console.log('Client disconnected');
+        ws.on('close', (code, event) => {
+            console.log(`Client disconnected. Code: ${code}, Reason: ${event}`);
             clients.delete(ws);
         });
 

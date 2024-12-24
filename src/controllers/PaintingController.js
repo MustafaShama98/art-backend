@@ -57,6 +57,7 @@ class PaintingController {
 
     async createPainting(req, res) {
         try {
+            console.log('creating')
             const { photo, ...otherData } = req.body;
     
             // Convert Base64 to Buffer
@@ -68,8 +69,8 @@ class PaintingController {
                 photo: bufferPhoto, // Save buffer in DB
             };
                 
-            const response = await this.mqttService.publish_installation(installationData);
-    
+            const response = await this.mqttService.publish_installation({sys_id: installationData.sys_id, ...otherData} );
+            console.log(response)
             if (response.success) {
                 const painting = new Painting({ ...installationData, status: 'Active' });
                 await painting.save();
