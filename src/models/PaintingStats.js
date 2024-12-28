@@ -45,6 +45,15 @@ const paintingStatsSchema = new mongoose.Schema({
         type: Date,
         default: null
     },
+    isStill: { // Indicates whether the painting is still in the system or deleted
+        type: Boolean,
+        default: true, // Default to true (still in the system)
+    },
+    name: { 
+        type: String,
+        required: false
+        
+    },
     viewingSessions: [viewingSessionSchema],
     dailyStats: [{
         date: {
@@ -167,7 +176,8 @@ paintingStatsSchema.statics.getStatsByDateRange = async function(startDate, endD
 
 const PaintingStats = mongoose.model('Painting_Stats', paintingStatsSchema);
 module.exports = {PaintingStats,initializePaintingStats};
- async function initializePaintingStats() {
+ 
+async function initializePaintingStats() {
     // Get all paintings that don't have stats yet
     const paintings = await Painting.find();
     const {sys_id, _id  } = paintings[0];
@@ -177,7 +187,8 @@ module.exports = {PaintingStats,initializePaintingStats};
         if (!existingStats) {
             const newStats = new PaintingStats({
                 painting_id: _id,
-                sys_id: sys_id
+                sys_id: sys_id,
+                isStill: true, // Default to true
             });
             await newStats.save();
         }
@@ -191,7 +202,6 @@ module.exports = {PaintingStats,initializePaintingStats};
          new Date('2024-03-07')
      );
 console.log(weeklyStats)
-
- }
+}
 
 

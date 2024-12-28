@@ -69,7 +69,7 @@ const PORT = process.env.PORT || 5000;
 const server = app.listen(PORT, async () => {
     console.log(`Server is running on port ${PORT}`);
     await connectDB();
-     // await seedUsers();
+    await seedUsers();
     console.log("Connected to MongoDB");
 
 });

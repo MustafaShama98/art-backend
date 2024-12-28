@@ -1,5 +1,6 @@
 const Painting = require('../models/PaintingSystem');
 const {PaintingStats} = require('../models/PaintingStats');
+const { painting_status } = require('../utils/config');
 
 // controllers/PaintingController.js
 class PaintingController {
@@ -153,8 +154,15 @@ class PaintingController {
            const mqttResponse =  await this.mqttService.publish_deletion(req.params.sys_id);
             console.log('deletePainting: mqttResponse, ',mqttResponse)
             if(mqttResponse.success) {
+                
+                await PaintingStats.updateOne(
+                    { sys_id }, // Query to match the document
+                    { $set: { isStill: false , name: painting.name } }// Update operation
+                    
+
+                );
+               console.log(painting.name)
                 await Painting.deleteOne({ sys_id });
-                await PaintingStats.deleteOne( { sys_id})
 
                 res.json({
                     success: true,
@@ -170,25 +178,28 @@ class PaintingController {
     }
     async getStats(req, res) {
         try {
-            console.log('Inside getStats method');
-            
+    
             // Fetch stats and populate the painting name from the Painting model
             const stats = await PaintingStats.find()
                 .populate({
                     path: 'painting_id', // Reference to the Painting model
                     select: 'name', // Select only the name field from the Painting model
                 });
-
-                
-                // Flatten the response to include the painting name at the top level
-            const flattenedStats = stats.map(stat => ({
-                ...stat.toObject(),
-                name: stat.painting_id?.name || 'Unknown', 
-              
-            }));
-            console.log('Stats fetched:', flattenedStats);
     
-            
+         
+                        
+                      
+            // Flatten the response to include the painting name at the top level
+            const flattenedStats = stats.map(stat => {
+                const statObject = stat.toObject(); // Convert Mongoose Document to plain object
+                return {
+                    ...statObject, // Include all original fields
+                    name: stat.painting_id?.name || stat.name, // Add the name field
+                };
+            });
+            console.log("flaten", flattenedStats)
+    
+          
     
             res.json({
                 success: true,
@@ -202,6 +213,7 @@ class PaintingController {
             });
         }
     }
+    
     
 
 

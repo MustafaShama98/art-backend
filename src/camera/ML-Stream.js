@@ -12,8 +12,8 @@ class CameraProcessor {
     constructor(mqttClient) {
         this.mqttClient = mqttClient;
         this.activeSystems = new Map();
-        this.timeoutDuration = 24000;
-        this.errorTimeoutDuration = 25000;
+        this.timeoutDuration = 30000;
+        this.errorTimeoutDuration = 30000;
         this.frameInterval = 1000;
         this.frameCallbacks= new Map();
     }
@@ -87,8 +87,8 @@ class CameraProcessor {
             await this.saveFrame(sys_id, Buffer.from(base64Image, 'base64'));
 
 
-             //const isWheelchairDetected = await detect_activeLearning(base64Image);
-            const isWheelchairDetected = await mock_detect(base64Image);
+             const isWheelchairDetected = await detect_activeLearning(base64Image);
+           // const isWheelchairDetected = await mock_detect(base64Image);
 
             console.log(chalk.cyan(`System ${sys_id} - Wheelchair detection status:`, isWheelchairDetected));
 
