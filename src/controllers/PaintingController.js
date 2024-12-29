@@ -161,7 +161,7 @@ class PaintingController {
                     
 
                 );
-               console.log(painting.name)
+               console.log(Painting.name)
                 await Painting.deleteOne({ sys_id });
 
                 res.json({
