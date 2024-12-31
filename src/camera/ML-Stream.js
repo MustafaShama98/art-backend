@@ -87,8 +87,8 @@ class CameraProcessor {
             await this.saveFrame(sys_id, Buffer.from(base64Image, 'base64'));
 
 
-             const isWheelchairDetected = await detect_activeLearning(base64Image);
-           // const isWheelchairDetected = await mock_detect(base64Image);
+             //const isWheelchairDetected = await detect_activeLearning(base64Image);
+            const isWheelchairDetected = await mock_detect(base64Image);
 
             console.log(chalk.cyan(`System ${sys_id} - Wheelchair detection status:`, isWheelchairDetected));
 
@@ -274,7 +274,7 @@ async function detect_activeLearning(base64Image) {
 
 async function mock_detect(base64image){
     new Promise(resolve => setTimeout(resolve, 1000));
-    return true
+    return false
 }
 
 async function MockcaptureFrame(camera_host) {

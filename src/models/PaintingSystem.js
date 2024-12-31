@@ -54,8 +54,8 @@ const paintingSchema = new mongoose.Schema({
         required: false,
     },
     wheelchair: {
-        type: Boolean,
-        default: false,
+        type: Number,
+        default: 0,
         required: false,
     },
     height_adjust: {

@@ -45,7 +45,7 @@ class MQTTService extends IMQTTService {
                 sys_id = parseInt(sys_id)
                 if (!this.paintingStatusMap.has(sys_id)) {
                     this.paintingStatusMap.set(sys_id, {
-                        wheelchair: false,
+                        wheelchair: 0,
                         sensor: false,
                         height_adjust: false,
                     });
@@ -86,17 +86,21 @@ class MQTTService extends IMQTTService {
                                 await stats.save();
 
                                 // First approach - detect wheelchair
+                                painting.wheelchair = 1
+                                paintingStatus.wheelchair = 1;
+                                await broadcastWS({sys_id,...paintingStatus})
                                 const is_detected = await this.camera.startAnalyze(sys_id)
                                 await sleep(3000)
                                 if (is_detected.detected) {
                                     await this.publish_height(sys_id);
-                                    painting.wheelchair = true
-                                    paintingStatus.wheelchair = true;
+                                    painting.wheelchair = 2
+                                    paintingStatus.wheelchair = 2;
                                     await broadcastWS({sys_id,...paintingStatus})
 
                                 }else {
-                                    paintingStatus.wheelchair = false;
-                                    painting.wheelchair= false
+                                    paintingStatus.wheelchair = 0;
+                                    painting.wheelchair= 0
+                                    await broadcastWS({sys_id,...paintingStatus})
                                 }
 
                                 // Start new viewing session
@@ -121,15 +125,21 @@ class MQTTService extends IMQTTService {
                                     // paintingStatus.sensor = true
                                     // painting.sensor = true
                                     console.log(chalk.green('New approach - no ongoing session or previous session has ended:'));
+                                    paintingStatus.wheelchair = 1
+                                    painting.wheelchair = 1
+                                    await broadcastWS({sys_id,...paintingStatus})
                                     const is_detected = await this.camera.startAnalyze(sys_id);
                                     await sleep(3000)
-
                                     if (is_detected.detected) {
                                         await this.publish_height(sys_id);
-                                        paintingStatus.wheelchair = true
-                                        painting.wheelchair = true
+                                        paintingStatus.wheelchair = 2
+                                        painting.wheelchair = 2
                                         await broadcastWS({sys_id,...paintingStatus})
 
+                                    }else {
+                                        paintingStatus.wheelchair = 0;
+                                        painting.wheelchair= 0
+                                        await broadcastWS({sys_id,...paintingStatus})
                                     }
 
                                     // Start new session
@@ -142,10 +152,10 @@ class MQTTService extends IMQTTService {
                                     ('Person leaving - end current session\n'));
 
                                     await stats.addViewingSession(lastSession.startTime, currentTime);
-                                    paintingStatus.wheelchair = false
+                                    paintingStatus.wheelchair = 0
                                     paintingStatus.sensor = false
                                     paintingStatus.height_adjust = false
-                                    painting.wheelchair = false
+                                    painting.wheelchair = 0
                                     painting.sensor = false
                                     painting.height_adjust = false
                                     await broadcastWS({sys_id,...paintingStatus})
@@ -284,7 +294,7 @@ class MQTTService extends IMQTTService {
                 return null;
 
             const {base_height, height} = found_painting;
-            const height_adjust = base_height - (height / 2 + 122);
+            const height_adjust = base_height - (height / 2 + 130);
 
             if (height_adjust > 0) {
                 // Publish with QoS 2
