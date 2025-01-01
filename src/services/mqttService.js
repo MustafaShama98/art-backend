@@ -294,7 +294,8 @@ class MQTTService extends IMQTTService {
                 return null;
 
             const {base_height, height} = found_painting;
-            const height_adjust = base_height - (height / 2 + 130);
+            const height_adjust = (height / 2 + base_height)-119.25 ;
+           
 
             if (height_adjust > 0) {
                 // Publish with QoS 2
