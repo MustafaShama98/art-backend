@@ -76,7 +76,7 @@ class PaintingController {
                 const painting = new Painting({ ...installationData, status: 'Active' });
                 await painting.save();
     
-                res.status(201).json({
+                res.status(200).json({
                     success: true,
                     data: painting,
                 });

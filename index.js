@@ -21,7 +21,7 @@ app.use(session({
 // Import routes
 const paintingRoutes = require('./src/routes/PaintingRouter');
 const connectDB = require("./src/database/config");
-const {processFrame, processCamera, start_camera_analyze} = require("./src/camera/ML-Stream");
+const {processFrame, processCamera, start_camera_analyze, deleteAllFrameFolders} = require("./src/camera/ML-Stream");
 const MQTTService = require("./src/services/mqttService");
 const {initializePaintingStats} = require("./src/models/PaintingStats");
 const {seedUsers} = require("./src/models/User");
@@ -70,6 +70,7 @@ const server = app.listen(PORT, async () => {
     console.log(`Server is running on port ${PORT}`);
     await connectDB();
     await seedUsers();
+    await deleteAllFrameFolders()
     console.log("Connected to MongoDB");
 
 });

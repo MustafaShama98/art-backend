@@ -134,6 +134,7 @@ class CameraProcessor {
         }
     }
 
+
     isTimeoutReached(startTime) {
         return Date.now() - startTime >= this.timeoutDuration;
     }
@@ -187,7 +188,7 @@ class CameraProcessor {
     }
 }
 
-module.exports = CameraProcessor;
+
 
 
 // Function to send a Base64-encoded image to the ML API
@@ -290,3 +291,31 @@ async function MockcaptureFrame(camera_host) {
         };
     }
 
+async function deleteAllFrameFolders() {
+    try {
+        // Define the path to the "frames" directory
+        const framesPath = path.join(__dirname, 'frames');
+
+        // Check if the "frames" directory exists
+        try {
+            const folders = await fs.readdir(framesPath, { withFileTypes: true });
+
+            // Filter and delete only directories
+            for (const folder of folders) {
+                if (folder.isDirectory()) {
+                    const folderPath = path.join(framesPath, folder.name);
+                    await fs.rm(folderPath, { recursive: true, force: true });
+                    console.log(chalk.green(`Deleted folder: ${folderPath}`));
+                }
+            }
+        } catch (err) {
+            console.error(chalk.red(`Error reading "frames" directory:`, err.message));
+        }
+    } catch (err) {
+        console.error(chalk.red('Error deleting frame folders:', err.message));
+    }
+}
+module.exports = {
+    deleteAllFrameFolders,
+    CameraProcessor
+};

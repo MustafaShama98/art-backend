@@ -3,7 +3,7 @@ const Painting = require('../models/PaintingSystem');
 const IMQTTService = require("../interfaces/IMQTTService");
 const chalk = require('chalk');
 const {start_camera_analyze} = require("../camera/ML-Stream");
-const CameraProcessor = require("../camera/ML-Stream");
+const {CameraProcessor} = require("../camera/ML-Stream");
 const {PaintingStats} = require("../models/PaintingStats");
 const { AsyncClient } = require("async-mqtt");
 const {broadcastWS} = require("./websocketService");
@@ -28,10 +28,16 @@ class MQTTService extends IMQTTService {
         this.frameCallbacks = new Map();
         this.devices = []
         this.camera = new CameraProcessor(this);
-        this.mqttClient.on('connect', () => {
+        this.mqttClient.on('connect', async () => {
             console.log('Connected to MQTT broker');
-
+            const result = await Painting.updateMany({}, { $set: { status: 'Inactive' } });
+            console.log(`${result.modifiedCount} paintings updated to "Inactive".`);
             this.mqttClient.subscribe('m5stack/#', {qos: 2});
+            this.mqttClient.publish(
+                `status`,
+                JSON.stringify(""),
+                {qos: 2}
+            );
         });
 
         this.mqttClient.on('message', async (topic, message) => {
@@ -39,7 +45,7 @@ class MQTTService extends IMQTTService {
                 console.log(`Received message on topic: ${topic}`);
 
                 const payload = JSON.parse(message?.toString());
-                console.log('Message payload:');
+                console.log('Message payload:',payload);
 
                 let [mainTopic, sys_id, subTopic] = topic.split('/');
                 sys_id = parseInt(sys_id)
@@ -60,6 +66,19 @@ class MQTTService extends IMQTTService {
                 }
 
                 switch (subTopic) {
+                    case 'active':
+                        const found_painting = await Painting.findOne({sys_id})
+                        if(found_painting && payload.status ) {
+                            found_painting.status = "Active"
+                            await broadcastWS({sys_id, status: "Active"})
+                            await found_painting.save();
+                        }
+                        else if(found_painting && payload.status === false){
+                        found_painting.status = "Inactive"
+                        await broadcastWS({sys_id, status : "Inactive"})
+                        await found_painting.save()
+                    }
+                        break;
                     case 'sensor':
                         console.log(`sensor :  response from ${sys_id}:`);
                         const paintingStatus = this.paintingStatusMap.get(sys_id)
@@ -212,6 +231,7 @@ class MQTTService extends IMQTTService {
                     case 'frame_response':
                         const frameCallback = this.frameCallbacks.get(sys_id);
                         if (frameCallback) {
+                            console.log('framecallback', frameCallback)
                             frameCallback(payload.frameData);
                             this.frameCallbacks.delete(sys_id);
                         }
