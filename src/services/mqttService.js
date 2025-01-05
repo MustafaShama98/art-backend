@@ -45,7 +45,7 @@ class MQTTService extends IMQTTService {
                 console.log(`Received message on topic: ${topic}`);
 
                 const payload = JSON.parse(message?.toString());
-                console.log('Message payload:',payload);
+                // console.log('Message payload:',payload);
 
                 let [mainTopic, sys_id, subTopic] = topic.split('/');
                 sys_id = parseInt(sys_id)
@@ -74,13 +74,32 @@ class MQTTService extends IMQTTService {
                             await found_painting.save();
                         }
                         else if(found_painting && payload.status === false){
-                        found_painting.status = "Inactive"
-                        await broadcastWS({sys_id, status : "Inactive"})
-                        await found_painting.save()
+                            if (this.camera.cameraPromisesMap.get(sys_id)) {
+                                const {resolve, reject} = this.camera.cameraPromisesMap.get(sys_id);
+                                // Option A: Manually resolve
+                                resolve({detected: false, reason: 'manually_resolved'})
+                            }
+                            this.camera.stopCamera(sys_id)
+                            found_painting.status = "Inactive"
+                            await broadcastWS({sys_id, status : "Inactive"})
+                            await found_painting.save()
                     }
                         break;
                     case 'sensor':
                         console.log(`sensor :  response from ${sys_id}:`);
+                        // if (this.camera.activeSystems.get(sys_id) === 'active') {
+                        //     console.log(chalk.yellow(`mqttservice: System ${sys_id} is already running`));
+                        //     this.camera.stopCamera(sys_id)
+                        //     return;
+                        //
+                           if (this.camera.activeSystems.get(sys_id) === 'active') {
+                               const {resolve, reject} = this.camera.cameraPromisesMap.get(sys_id);
+                               // Option A: Manually resolve
+                               resolve({detected: false, reason: 'manually_resolved'})
+                               this.camera.stopCamera(sys_id)
+                               break;
+                           }
+
                         const paintingStatus = this.paintingStatusMap.get(sys_id)
                         paintingStatus.sensor = true;
                         await broadcastWS({sys_id,...paintingStatus})
@@ -143,13 +162,17 @@ class MQTTService extends IMQTTService {
                                     // New approach - no ongoing session or previous session has ended
                                     // paintingStatus.sensor = true
                                     // painting.sensor = true
+                                    // if(this.camera.activeSystems.get(sys_id) === 'active'){
+                                    //     this.camera.stopCamera(sys_id) //stop process midway if person left
+                                    // }
                                     console.log(chalk.green('New approach - no ongoing session or previous session has ended:'));
                                     paintingStatus.wheelchair = 1
                                     painting.wheelchair = 1
                                     await broadcastWS({sys_id,...paintingStatus})
                                     const is_detected = await this.camera.startAnalyze(sys_id);
-                                    await sleep(3000)
-                                    if (is_detected.detected) {
+                                    console.log('is detetcted,', is_detected)
+                                    //await sleep(1000)
+                                    if (is_detected?.detected) {
                                         await this.publish_height(sys_id);
                                         paintingStatus.wheelchair = 2
                                         painting.wheelchair = 2
@@ -163,7 +186,22 @@ class MQTTService extends IMQTTService {
 
                                     // Start new session
                                     await stats.addViewingSession(currentTime, null);
+                                   const saved_stat=  await stats.save();
 
+                                    if(is_detected.reason === "manually_resolved"){
+                                        // Person leaving - end current session
+                                        console.log(chalk.green
+                                        ('Person leaving - end current session\n'));
+                                       const leave_stats= await saved_stat.addViewingSession(currentTime, new Date());
+                                        paintingStatus.wheelchair = 0
+                                        paintingStatus.sensor = false
+                                        paintingStatus.height_adjust = false
+                                        painting.wheelchair = 0
+                                        painting.sensor = false
+                                        painting.height_adjust = false
+                                        await broadcastWS({sys_id,...paintingStatus})
+                                        await leave_stats.save();
+                                    }
 
                                 } else {
                                     // Person leaving - end current session
@@ -178,10 +216,11 @@ class MQTTService extends IMQTTService {
                                     painting.sensor = false
                                     painting.height_adjust = false
                                     await broadcastWS({sys_id,...paintingStatus})
+                                    await stats.save();
                                 }
                             }
 
-                            await stats.save();
+
                             await painting.save()
                             console.log(chalk.bgGreen(`Updated viewing statistics for painting ${sys_id}`));
 

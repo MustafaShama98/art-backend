@@ -12,30 +12,50 @@ class CameraProcessor {
     constructor(mqttClient) {
         this.mqttClient = mqttClient;
         this.activeSystems = new Map();
-        this.timeoutDuration = 30000;
+        this.timeoutDuration = 24000;
         this.errorTimeoutDuration = 30000;
-        this.frameInterval = 1000;
+        this.frameInterval = 3000;
         this.frameCallbacks= new Map();
+        // Store promises so we can resolve/reject later
+        this.cameraPromisesMap = new Map();
     }
     async startAnalyze(sys_id) {
         if (this.activeSystems.get(sys_id) === 'active') {
             console.log(chalk.yellow(`System ${sys_id} is already running`));
+            this.stopCamera(sys_id);
             return;
         }
 
         try {
-            console.log('Start camera frame analyzing..')
-            const result = await this.processCamera(sys_id);
-            // Publish frame request
+            console.log('Start camera frame analyzing...');
+            this.activeSystems.set(sys_id, 'active');
 
-
-            console.log(chalk.blue(`System ${sys_id} completed processing:`), {
-                detected: result.detected,
-                reason: result.reason
+            const cameraPromise = new Promise((resolve, reject) => {
+                this.cameraPromisesMap.set(sys_id, { resolve, reject });
             });
-            return result;
+
+            this.processCamera(sys_id)
+                .then((result) => {
+                    console.log('result, ', result);
+                    console.log(chalk.blue(`System ${sys_id} completed processing:`), {
+                        detected: result.detected,
+                        reason: result.reason,
+                    });
+                    this.cameraPromisesMap.get(sys_id).resolve(result);
+                    this.stopCamera(sys_id);
+                })
+                .catch((error) => {
+                    console.error(chalk.red(`Fatal error in system ${sys_id}:`), error);
+                    this.stopCamera(sys_id);
+                    this.cameraPromisesMap.get(sys_id).reject({
+                        detected: false,
+                        reason: 'fatal_error',
+                    });
+                });
+
+            return cameraPromise;
         } catch (error) {
-            console.error(chalk.red(`Fatal error in system ${sys_id}:`, error));
+            console.error(chalk.red(`Fatal error in system ${sys_id}:`), error);
             this.activeSystems.delete(sys_id);
             return { detected: false, reason: 'fatal_error' };
         }
@@ -61,20 +81,16 @@ class CameraProcessor {
         return this.activeSystems.get(sys_id) || 'not started';
     }
 
-    stopCamera(sys_id) {
-        if (this.activeSystems.has(sys_id)) {
-            this.activeSystems.delete(sys_id);
-            console.log(chalk.yellow(`Manually stopped system ${sys_id}`));
-            return true;
-        }
-        return false;
-    }
+
     async processCamera(sys_id, startProcessingTime = Date.now()) {
         if (this.isTimeoutReached(startProcessingTime)) {
             return this.handleTimeout(sys_id);
         }
-
-        this.activeSystems.set(sys_id, 'active');
+        // Check if system was stopped
+        if (!this.activeSystems.has(sys_id)) {
+            console.log(chalk.yellow(`System ${sys_id} processing stopped mid-way.`));
+            return { detected: false, reason: 'sensor got out of range' };
+        }
         const frameStartTime = Date.now();
 
         try {
@@ -139,6 +155,8 @@ class CameraProcessor {
         return Date.now() - startTime >= this.timeoutDuration;
     }
 
+
+
     handleTimeout(sys_id) {
         this.activeSystems.delete(sys_id);
         console.log(chalk.bgYellow(`System ${sys_id} - Timeout reached`));
@@ -180,9 +198,9 @@ class CameraProcessor {
 
     stopCamera(sys_id) {
         if (this.activeSystems.has(sys_id)) {
-            this.activeSystems.delete(sys_id);
-            console.log(chalk.yellow(`Manually stopped system ${sys_id}`));
-            return true;
+            this.activeSystems.delete(sys_id); // Remove from active systems
+            console.log(chalk.yellow(`System ${sys_id} stopped `));
+            return { detected: false, reason: 'stopped process midway' };
         }
         return false;
     }
