@@ -28,16 +28,20 @@ class MQTTService extends IMQTTService {
         this.frameCallbacks = new Map();
         this.devices = []
         this.camera = new CameraProcessor(this);
+
         this.mqttClient.on('connect', async () => {
             console.log('Connected to MQTT broker');
             const result = await Painting.updateMany({}, { $set: { status: 'Inactive' } });
             console.log(`${result.modifiedCount} paintings updated to "Inactive".`);
             this.mqttClient.subscribe('m5stack/#', {qos: 2});
+
+
             this.mqttClient.publish(
                 `status`,
                 JSON.stringify(""),
                 {qos: 2}
             );
+
         });
 
         this.mqttClient.on('message', async (topic, message) => {
@@ -66,7 +70,7 @@ class MQTTService extends IMQTTService {
                 }
 
                 switch (subTopic) {
-                    case 'active':
+                    case 'active': 
                         const found_painting = await Painting.findOne({sys_id})
                         if(found_painting && payload.status ) {
                             found_painting.status = "Active"
@@ -86,12 +90,24 @@ class MQTTService extends IMQTTService {
                     }
                         break;
                     case 'sensor':
-                        console.log(`sensor :  response from ${sys_id}:`);
+                        console.log(`sensor :  response from ${sys_id} `);
                         // if (this.camera.activeSystems.get(sys_id) === 'active') {
                         //     console.log(chalk.yellow(`mqttservice: System ${sys_id} is already running`));
                         //     this.camera.stopCamera(sys_id)
                         //     return;
                         //
+    
+                        // Parse the payload to extract the sensor status
+                        const payload = message.toString();
+                        let parsedPayload;
+                        try {
+                            parsedPayload = JSON.parse(payload);
+                        } catch (error) {
+                            console.error(`Failed to parse payload for sys_id ${sys_id}:`, error);
+                            break;
+                        }
+                        const { status :sensor_status, distance } = parsedPayload;
+                        // Check if the system is active
                            if (this.camera.activeSystems.get(sys_id) === 'active') {
                                const {resolve, reject} = this.camera.cameraPromisesMap.get(sys_id);
                                // Option A: Manually resolve
@@ -228,7 +244,7 @@ class MQTTService extends IMQTTService {
                             console.error('Error handling sensor trigger:', error);
                         }
                         break;
-                    case 'height':
+                    case 'height_done':
                         console.log(chalk.bgMagenta(`Height adjustment response from ${sys_id}:`), payload);
                         const status = this.paintingStatusMap.get(sys_id);
                         const painting = await Painting.findOne({sys_id})
@@ -353,7 +369,7 @@ class MQTTService extends IMQTTService {
                 return null;
 
             const {base_height, height} = found_painting;
-            const height_adjust = (height / 2 + base_height)-119.25 ;
+            const height_adjust = Math.round((height / 2 + base_height) - 119.25);
            
 
             if (height_adjust > 0) {
