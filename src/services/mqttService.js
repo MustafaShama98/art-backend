@@ -152,10 +152,13 @@ class MQTTService extends IMQTTService {
                                         await broadcastWS({ sys_id, ...paintingStatus });
                         
                                         const isDetected = await this.camera.startAnalyze(sys_id);
-                                        await sleep(3000);
+                                        // await sleep(3000);
                         
                                         if (isDetected.detected) {
-                                            await this.publish_height(sys_id);
+                                            if(await this.publish_height(sys_id) !== false){
+                                                painting.height_adjust = true;
+                                                painting.height_adjust = true;
+                                            }
                                             painting.wheelchair = 2;
                                             paintingStatus.wheelchair = 2;
                                             await broadcastWS({ sys_id, ...paintingStatus });
@@ -178,8 +181,10 @@ class MQTTService extends IMQTTService {
                                             logger.info('Detection result:', isDetected);
                         
                                             if (isDetected?.detected) {
-                                                await this.publish_height(sys_id);
-                                                painting.wheelchair = 2;
+                                                if(await this.publish_height(sys_id) !== false){
+                                                    painting.height_adjust = true;
+                                                    painting.height_adjust = true;
+                                                }                                                painting.wheelchair = 2;
                                                 paintingStatus.wheelchair = 2;
                                                 await broadcastWS({ sys_id, ...paintingStatus });
                                             } else {
