@@ -152,13 +152,15 @@ class MQTTService extends IMQTTService {
                                         await broadcastWS({ sys_id, ...paintingStatus });
                         
                                         const isDetected = await this.camera.startAnalyze(sys_id);
-                                        // await sleep(3000);
+                                        //   await sleep(8000);
                         
                                         if (isDetected.detected) {
-                                            if(await this.publish_height(sys_id) !== false){
+                                           if( await this.publish_height(sys_id))
+                                            {
                                                 painting.height_adjust = true;
-                                                painting.height_adjust = true;
+                                                paintingStatus.height_adjust = true;
                                             }
+                                        
                                             painting.wheelchair = 2;
                                             paintingStatus.wheelchair = 2;
                                             await broadcastWS({ sys_id, ...paintingStatus });
@@ -179,12 +181,15 @@ class MQTTService extends IMQTTService {
                         
                                             const isDetected = await this.camera.startAnalyze(sys_id);
                                             logger.info('Detection result:', isDetected);
-                        
+                                            // await sleep(6000);
                                             if (isDetected?.detected) {
-                                                if(await this.publish_height(sys_id) !== false){
+                                                if( await this.publish_height(sys_id))
+                                                {
                                                     painting.height_adjust = true;
-                                                    painting.height_adjust = true;
-                                                }                                                painting.wheelchair = 2;
+                                                    paintingStatus.height_adjust = true;
+                                                }
+
+                                                painting.wheelchair = 2;
                                                 paintingStatus.wheelchair = 2;
                                                 await broadcastWS({ sys_id, ...paintingStatus });
                                             } else {
@@ -398,7 +403,7 @@ class MQTTService extends IMQTTService {
                 return null;
 
             const {base_height, height} = found_painting;
-            const height_adjust = Math.round((height / 2 + base_height) - 119.25);
+            const height_adjust = Math.round((height / 2 + base_height) - 125);
            
 
             if (height_adjust > 0) {
