@@ -30,7 +30,6 @@ const sleep = (ms) =>
 class MQTTService extends IMQTTService {
     constructor() {
         super();
-        logger.info('mqttttttt')
         this.mqttClient = mqtt.connect('mqtt://j81f31b4.ala.eu-central-1.emqxsl.com', {
             username: "art",
             password: "art123",
